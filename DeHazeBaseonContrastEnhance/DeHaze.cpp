@@ -189,72 +189,69 @@ void EstimateTransmission(cv::Mat& srcImage, cv::Mat& transmission, cv::Size& tr
 		cv::Mat inputImage;
 		srcImage.convertTo(inputImage, CV_32S);
 
-		cv::Mat transMat(srcImage.rows, srcImage.cols, srcImage.channels() == 3 ? CV_32SC3 : CV_32SC1, srcImage.channels() == 3 ? cv::Scalar(427, 427, 427) : cv::Scalar(427));
 		transmission = cv::Mat(srcImage.rows, srcImage.cols, CV_32FC1, cv::Scalar(0.3));
-		cv::Mat atomMat = cv::Mat(srcImage.rows, srcImage.cols, srcImage.channels() == 3 ? CV_32SC3 : CV_32SC1, srcImage.channels() == 3 ? cv::Scalar(vAtom[0], vAtom[1], vAtom[2]) : cv::Scalar(vAtom[0]));
 
 		std::vector<float> vCost;
 		std::vector<float> vTrans;
+		std::vector<int> vTempTrans;
 
 		for (int iterCount = 0; iterCount < 7; iterCount++)
 		{
-			cv::Mat pilotImage = (inputImage - atomMat) / transMat + atomMat;
-			int channels = pilotImage.channels();
+			int channels = inputImage.channels();
 			int index = 0;
 			for (int startY = 0; startY < inputImage.rows; startY += transBlockSize.height)
 			{
 				for (int startX = 0; startX < inputImage.cols; startX += transBlockSize.width)
 				{
+					if (iterCount == 0)
+					{
+						vTempTrans.push_back(427);
+					}
 					int endX = __min(startX + transBlockSize.width, inputImage.cols);
 					int endY = __min(startY + transBlockSize.height, inputImage.rows);
-					double fSumofSLoss = 0;
-					double fSumofSquaredOuts = 0;
-					double fSumofOuts = 0;
+					double dSumofSLoss = 0;
+					double dSumofSquaredOuts = 0;
+					double dSumofOuts = 0;
 					int nNumofPixels = channels == 3 ? (endY - startY)*(endX - startX) * 3 : (endY - startY)*(endX - startX);
-
-					//cv::Mat roiMat = pilotImage(cv::Rect(startX, startY, endX - startX, endY - startY));				//公式中计算对比度流程
-					//cv::Mat meanMat, stdMat;																			//公式中计算对比度流程
-					//cv::meanStdDev(roiMat, meanMat, stdMat);															//公式中计算对比度流程
 
 					for (int nY = startY; nY < endY; nY++)
 					{
 						cv::Vec3i* data = nullptr;
-						int* fdata = nullptr;
+						int* ndata = nullptr;
 						if (channels == 3)
-							data = pilotImage.ptr<cv::Vec3i>(nY);
+							data = inputImage.ptr<cv::Vec3i>(nY);
 						else
-							fdata = pilotImage.ptr<int>(nY);
+							ndata = inputImage.ptr<int>(nY);
 						for (int nX = startX; nX < endX; nX++)
 						{
-							cv::Vec3i outPut;
-							int foutPut;
+							int outPutR, outPutG, outPutB;
+							int noutPut;
 							if (channels == 3)
 							{
-								outPut = data[nX];
-								if (outPut[0]>255){ fSumofSLoss += (outPut[0] - 255)*(outPut[0] - 255); }
-								else if (outPut[0] < 0){ fSumofSLoss += outPut[0] * outPut[0]; }
-								if (outPut[1]>255){ fSumofSLoss += (outPut[1] - 255)*(outPut[1] - 255); }
-								else if (outPut[1] < 0){ fSumofSLoss += outPut[1] * outPut[1]; }
-								if (outPut[2]>255){ fSumofSLoss += (outPut[2] - 255)*(outPut[2] - 255); }
-								else if (outPut[2] < 0){ fSumofSLoss += outPut[2] * outPut[2]; }
-								fSumofSquaredOuts += outPut[0] * outPut[0] + outPut[1] * outPut[1] + outPut[2] * outPut[2];
-								fSumofOuts += outPut[0] + outPut[1] + outPut[2];
-								//fSumofSquaredOuts += std::pow((outPut[0] - meanMat.at<double>(0, 0)), 2) + std::pow((outPut[1] - meanMat.at<double>(1, 0)), 2) + std::pow((outPut[2] - meanMat.at<double>(2, 0)), 2); //公式中计算对比度流程
+								outPutB = ((data[nX][0] - int(vAtom[0]))*vTempTrans[index] + 128 * int(vAtom[0])) >> 7;
+								outPutG = ((data[nX][1] - int(vAtom[1]))*vTempTrans[index] + 128 * int(vAtom[1])) >> 7;
+								outPutR = ((data[nX][2] - int(vAtom[2]))*vTempTrans[index] + 128 * int(vAtom[2])) >> 7;
+								if (outPutB>255){ dSumofSLoss += (outPutB - 255)*(outPutB - 255); }
+								else if (outPutB < 0){ dSumofSLoss += outPutB * outPutB; }
+								if (outPutG>255){ dSumofSLoss += (outPutG - 255)*(outPutG - 255); }
+								else if (outPutG < 0){ dSumofSLoss += outPutG * outPutG; }
+								if (outPutR>255){ dSumofSLoss += (outPutR - 255)*(outPutR - 255); }
+								else if (outPutR < 0){ dSumofSLoss += outPutR * outPutR; }
+								dSumofSquaredOuts += outPutB * outPutB + outPutG * outPutG + outPutR * outPutR;
+								dSumofOuts += outPutB + outPutG + outPutR;
 							}
 							else
 							{
-								foutPut = fdata[nX];
-								if (foutPut > 255){ fSumofSLoss += (foutPut - 255)*(foutPut - 255); }
-								else if (foutPut < 0){ fSumofSLoss += foutPut * foutPut; }
-								fSumofSquaredOuts += foutPut*foutPut;
-								fSumofOuts += foutPut;
-								//fSumofSquaredOuts += std::pow((outPut[0] - meanMat.at<double>(0, 0)), 2);							//公式中计算对比度流程
+								noutPut = ndata[nX];
+								if (noutPut > 255){ dSumofSLoss += (noutPut - 255)*(noutPut - 255); }
+								else if (noutPut < 0){ dSumofSLoss += noutPut * noutPut; }
+								dSumofSquaredOuts += noutPut*noutPut;
+								dSumofOuts += noutPut;
 							}
 						}
 					}
-					float fMean = fSumofOuts / (float)nNumofPixels;
-					float fCost = costLambda*fSumofSLoss / (float)nNumofPixels - (fSumofSquaredOuts / (float)nNumofPixels - fMean*fMean);
-					//float fCost = costLambda*fSumofSLoss / (float)nNumofPixels - (fSumofSquaredOuts / (float)nNumofPixels);			//公式中计算对比度流程
+					float fMean = dSumofOuts / (float)nNumofPixels;
+					float fCost = costLambda*dSumofSLoss / (float)nNumofPixels - (dSumofSquaredOuts / (float)nNumofPixels - fMean*fMean);
 					if (iterCount == 0)
 					{
 						vCost.push_back(fCost);
@@ -266,7 +263,7 @@ void EstimateTransmission(cv::Mat& srcImage, cv::Mat& transmission, cv::Size& tr
 						transmission(cv::Rect(startX, startY, endX - startX, endY - startY)) = cv::Scalar(vTrans[index]);
 					}
 					vTrans[index] += 0.1;
-					transMat(cv::Rect(startX, startY, endX - startX, endY - startY)) = channels == 3 ? cv::Scalar(vTrans[index], vTrans[index], vTrans[index]) : cv::Scalar(vTrans[index]);
+					vTempTrans[index] = (int)(1.0f / vTempTrans[index] * 128.0f);
 					index++;
 				}
 			}
