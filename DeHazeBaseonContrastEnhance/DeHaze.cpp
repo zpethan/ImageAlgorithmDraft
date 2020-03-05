@@ -1,5 +1,23 @@
 #include "DeHaze.h"
 
+//估计图像大气光值
+void EstimateAirlight(cv::Mat& srcImage, cv::Size& minSize, std::vector<float>& vAtom);
+
+//估计粗透射率
+void EstimateTransmission(cv::Mat& srcImage, cv::Mat& transmission, cv::Size& transBlockSize, float costLambda, std::vector<float>& vAtom);
+
+//细化透射率
+void RefiningTransmission(cv::Mat& transmission, cv::Mat& srcImage, cv::Mat& refinedTransmission, int r, double eps);
+
+//重建图像
+void RestoreImage(cv::Mat& srcImage, cv::Mat& transmission, cv::Mat& dstImage, std::vector<float>& vAtom);
+
+//导向滤波
+void GuidedFileter(cv::Mat& guidedImage, cv::Mat& inputImage, cv::Mat& outPutImage, int r, double eps);
+
+//gamma校正
+void GammaTransform(cv::Mat &image, cv::Mat &dist, double gamma);
+
 void DeHazeBaseonContrastEnhance(cv::Mat& srcImg, cv::Mat& dstImg, cv::Size& transBlockSize, float fLambda, int guidedRadius, double eps, float fGamma /*= 1*/)
 {
 	try
@@ -98,77 +116,93 @@ void EstimateAirlight(cv::Mat& srcImage, cv::Size& minSize, std::vector<float>& 
 
 		int nDistance = 0;
 		int nMinDistance = 65536;
-		int nStep = holeImage.step;
 		for (int nY = 0; nY < height; nY++)
 		{
+			cv::Vec3b* data = nullptr;
+			uchar* udata = nullptr;
+			if (holeImage.channels() == 3)
+			{
+				data = holeImage.ptr<cv::Vec3b>(nY);
+			}
+			else
+			{
+				udata = holeImage.ptr<uchar>(nY);
+			}
+
 			for (int nX = 0; nX < width; nX++)
 			{
 				if (holeImage.channels() == 3)
 				{
-					nDistance = int(sqrt(float(255 - (uchar)holeImage.data[nY*nStep + nX * 3])*float(255 - (uchar)holeImage.data[nY*nStep + nX * 3])
-						+ float(255 - (uchar)holeImage.data[nY*nStep + nX * 3 + 1])*float(255 - (uchar)holeImage.data[nY*nStep + nX * 3 + 1])
-						+ float(255 - (uchar)holeImage.data[nY*nStep + nX * 3 + 2])*float(255 - (uchar)holeImage.data[nY*nStep + nX * 3 + 2])));
+
+					nDistance = int(sqrt(float(255 - data[nX][0])*float(255 - (uchar)data[nX][0])
+						+ float(255 - (uchar)data[nX][1])*float(255 - (uchar)data[nX][1])
+						+ float(255 - (uchar)data[nX][2])*float(255 - (uchar)data[nX][2])));
 					if (nMinDistance > nDistance)
 					{
 						nMinDistance = nDistance;
-						vAtom[0] = (uchar)holeImage.data[nY*nStep + nX * 3];
-						vAtom[1] = (uchar)holeImage.data[nY*nStep + nX * 3 + 1];
-						vAtom[2] = (uchar)holeImage.data[nY*nStep + nX * 3 + 2];
-
-						//矫正大气光，并非作者代码操作，有利于降低去雾后的色偏，但是某些条件下可能稍微降低去雾效果
-						auto smallest = std::min_element(std::begin(vAtom), std::end(vAtom));
-						int idxMin = std::distance(std::begin(vAtom), smallest);
-						auto largest = std::max_element(std::begin(vAtom), std::end(vAtom));
-						int idxMax = std::distance(std::begin(vAtom), largest);
-						if (idxMax + idxMin == 1)
-						{
-							if (vAtom[idxMax] - vAtom[idxMin] > 11)
-							{
-								vAtom[idxMin] = int((vAtom[idxMax] + vAtom[2]) / 2);
-							}
-							if (vAtom[idxMax] - vAtom[2] > 11)
-							{
-								vAtom[2] = int((vAtom[idxMax] + vAtom[idxMin]) / 2);
-							}
-						}
-						else if ((idxMax + idxMin == 2) && (idxMax != idxMin))
-						{
-							if (vAtom[idxMax] - vAtom[idxMin] > 11)
-							{
-								vAtom[idxMin] = int((vAtom[idxMax] + vAtom[1]) / 2);
-							}
-							if (vAtom[idxMax] - vAtom[1] > 11)
-							{
-								vAtom[1] = int((vAtom[idxMax] + vAtom[idxMin]) / 2);
-							}
-						}
-						else if (idxMax + idxMin == 3)
-						{
-							if (vAtom[idxMax] - vAtom[idxMin] > 11)
-							{
-								vAtom[idxMin] = int((vAtom[idxMax] + vAtom[0]) / 2);
-							}
-							if (vAtom[idxMax] - vAtom[0] > 11)
-							{
-								vAtom[0] = int((vAtom[idxMax] + vAtom[idxMin]) / 2);
-							}
-						}
-						vAtom[0] = vAtom[0] * 0.95;
-						vAtom[1] = vAtom[1] * 0.95;
-						vAtom[2] = vAtom[2] * 0.95;
+						vAtom[0] = (uchar)data[nX][0];
+						vAtom[1] = (uchar)data[nX][1];
+						vAtom[2] = (uchar)data[nX][2];
 					}
 				}
 				else
 				{
-					nDistance = int(sqrt(float(255 - (uchar)holeImage.data[nY*nStep + nX])*float(255 - (uchar)holeImage.data[nY*nStep + nX])));
+					nDistance = int(sqrt(float(255 - (uchar)udata[nX])*float(255 - (uchar)udata[nX])));
 					if (nMinDistance > nDistance)
 					{
 						nMinDistance = nDistance;
-						vAtom[0] = (uchar)holeImage.data[nY*nStep + nX];
-						vAtom[0] = vAtom[0] * 0.95;
+						vAtom[0] = (uchar)udata[nX];
 					}
 				}
 			}
+		}
+		//矫正大气光，并非作者代码操作，某些条件下有利于降低去雾后的色偏，但是可能稍微降低去雾效果
+		if (srcImage.channels() == 3)
+		{
+			auto smallest = std::min_element(std::begin(vAtom), std::end(vAtom));
+			int idxMin = std::distance(std::begin(vAtom), smallest);
+			auto largest = std::max_element(std::begin(vAtom), std::end(vAtom));
+			int idxMax = std::distance(std::begin(vAtom), largest);
+			if (idxMax + idxMin == 1)
+			{
+				if (vAtom[idxMax] - vAtom[idxMin] > 11)
+				{
+					vAtom[idxMin] = ((vAtom[idxMax] + vAtom[2]) / 2);
+				}
+				if (vAtom[idxMax] - vAtom[2] > 11)
+				{
+					vAtom[2] = ((vAtom[idxMax] + vAtom[idxMin]) / 2);
+				}
+			}
+			else if ((idxMax + idxMin == 2) && (idxMax != idxMin))
+			{
+				if (vAtom[idxMax] - vAtom[idxMin] > 11)
+				{
+					vAtom[idxMin] = ((vAtom[idxMax] + vAtom[1]) / 2);
+				}
+				if (vAtom[idxMax] - vAtom[1] > 11)
+				{
+					vAtom[1] = ((vAtom[idxMax] + vAtom[idxMin]) / 2);
+				}
+			}
+			else if (idxMax + idxMin == 3)
+			{
+				if (vAtom[idxMax] - vAtom[idxMin] > 11)
+				{
+					vAtom[idxMin] = ((vAtom[idxMax] + vAtom[0]) / 2);
+				}
+				if (vAtom[idxMax] - vAtom[0] > 11)
+				{
+					vAtom[0] = ((vAtom[idxMax] + vAtom[idxMin]) / 2);
+				}
+			}
+			vAtom[0] = vAtom[0] * 0.95;
+			vAtom[1] = vAtom[1] * 0.95;
+			vAtom[2] = vAtom[2] * 0.95;
+		}
+		else
+		{
+			vAtom[0] = vAtom[0] * 0.95;
 		}
 	}
 	catch (cv::Exception& e)
@@ -181,95 +215,105 @@ void EstimateAirlight(cv::Mat& srcImage, cv::Size& minSize, std::vector<float>& 
 	}
 }
 
+void ChannelEstimate(cv::Mat& oneChannelImg, int atom, float trans, int& nSLoss, int& nSquaredOuts, int& nOuts)
+{
+	int nX, nY;
+	int nOutPut;
+	uchar* data;
+	int nTrans = (int)(1.0f / trans*128.0f);
+	nSLoss = 0;
+	nSquaredOuts = 0;
+	nOuts = 0;
+	for (nY = 0; nY < oneChannelImg.rows; nY++)
+	{
+		data = oneChannelImg.ptr<uchar>(nY);
+		for (nX = 0; nX < oneChannelImg.cols; nX++)
+		{
+			nOutPut = ((data[nX] - atom)*nTrans + 128 * atom) >> 7;
+			nSquaredOuts += nOutPut*nOutPut;
+			nOuts += nOutPut;
+			if (nOutPut>0 && nOutPut < 255)
+			{
+				continue;
+			}
+			else if (nOutPut > 255)
+			{
+				nSLoss += (nOutPut - 255)*(nOutPut - 255);
+			}
+			else if (nOutPut < 0)
+			{
+				nSLoss += nOutPut*nOutPut;
+			}
+		}
+	}
+}
+
+float EstimateBlockTrans(cv::Mat& roiMat, float costLambda, std::vector<float>& vAtom)
+{
+	int channels = roiMat.channels();
+	std::vector<cv::Mat> vSplitChannels;
+	for (int i = 0; i < channels; i++)
+	{
+		vSplitChannels.push_back(cv::Mat(roiMat.rows, roiMat.cols, CV_8UC1));
+	}
+	cv::split(roiMat, vSplitChannels);
+	int nNumofPixels = channels == 3 ? roiMat.cols*roiMat.rows * 3 : roiMat.cols*roiMat.rows;
+	int iterCount;
+	int channelCount;
+	int nSumofSquaredOuts, nSumofOuts, nSumofSLoss;
+	float fMean, fCost, fMinCost;
+	int nSquaredOuts, nOuts, nSLoss;
+	float trans = 0.3;
+	float foptTrans;
+	for (iterCount = 0; iterCount < 7; iterCount++)
+	{
+		nSumofSquaredOuts = 0;
+		nSumofOuts = 0;
+		nSumofSLoss = 0;
+		for (channelCount = 0; channelCount < channels; channelCount++)
+		{
+			ChannelEstimate(vSplitChannels[channelCount], int(vAtom[channelCount]), trans, nSLoss, nSquaredOuts, nOuts);
+			nSumofSquaredOuts += nSquaredOuts;
+			nSumofOuts += nOuts;
+			nSumofSLoss += nSLoss;
+		}
+		fMean = float(nSumofOuts) / float(nNumofPixels);
+		fCost = costLambda * float(nSumofSLoss) / float(nNumofPixels) - (float(nSumofSquaredOuts) / float(nNumofPixels) - fMean*fMean);
+		if (iterCount == 0 || fMinCost > fCost)
+		{
+			fMinCost = fCost;
+			foptTrans = trans;
+		}
+		trans += 0.1f;
+	}
+	return foptTrans;
+}
+
 void EstimateTransmission(cv::Mat& srcImage, cv::Mat& transmission, cv::Size& transBlockSize, float costLambda, std::vector<float>& vAtom)
 {
-
 	try
 	{
-		cv::Mat inputImage;
-		srcImage.convertTo(inputImage, CV_32S);
-
+		int startX, startY;
 		transmission = cv::Mat(srcImage.rows, srcImage.cols, CV_32FC1, cv::Scalar(0.3));
-
-		std::vector<float> vCost;
-		std::vector<float> vTrans;
-		std::vector<int> vTempTrans;
-
-		for (int iterCount = 0; iterCount < 7; iterCount++)
+		float blockTrans;
+		cv::Mat roiMat;
+		for (startY = 0; startY < srcImage.rows; startY += transBlockSize.height)
 		{
-			int channels = inputImage.channels();
-			int index = 0;
-			for (int startY = 0; startY < inputImage.rows; startY += transBlockSize.height)
+			for (startX = 0; startX < srcImage.cols; startX += transBlockSize.width)
 			{
-				for (int startX = 0; startX < inputImage.cols; startX += transBlockSize.width)
-				{
-					if (iterCount == 0)
-					{
-						vTempTrans.push_back(427);
-					}
-					int endX = __min(startX + transBlockSize.width, inputImage.cols);
-					int endY = __min(startY + transBlockSize.height, inputImage.rows);
-					double dSumofSLoss = 0;
-					double dSumofSquaredOuts = 0;
-					double dSumofOuts = 0;
-					int nNumofPixels = channels == 3 ? (endY - startY)*(endX - startX) * 3 : (endY - startY)*(endX - startX);
-
-					for (int nY = startY; nY < endY; nY++)
-					{
-						cv::Vec3i* data = nullptr;
-						int* ndata = nullptr;
-						if (channels == 3)
-							data = inputImage.ptr<cv::Vec3i>(nY);
-						else
-							ndata = inputImage.ptr<int>(nY);
-						for (int nX = startX; nX < endX; nX++)
-						{
-							int outPutR, outPutG, outPutB;
-							int noutPut;
-							if (channels == 3)
-							{
-								outPutB = ((data[nX][0] - int(vAtom[0]))*vTempTrans[index] + 128 * int(vAtom[0])) >> 7;
-								outPutG = ((data[nX][1] - int(vAtom[1]))*vTempTrans[index] + 128 * int(vAtom[1])) >> 7;
-								outPutR = ((data[nX][2] - int(vAtom[2]))*vTempTrans[index] + 128 * int(vAtom[2])) >> 7;
-								if (outPutB>255){ dSumofSLoss += (outPutB - 255)*(outPutB - 255); }
-								else if (outPutB < 0){ dSumofSLoss += outPutB * outPutB; }
-								if (outPutG>255){ dSumofSLoss += (outPutG - 255)*(outPutG - 255); }
-								else if (outPutG < 0){ dSumofSLoss += outPutG * outPutG; }
-								if (outPutR>255){ dSumofSLoss += (outPutR - 255)*(outPutR - 255); }
-								else if (outPutR < 0){ dSumofSLoss += outPutR * outPutR; }
-								dSumofSquaredOuts += outPutB * outPutB + outPutG * outPutG + outPutR * outPutR;
-								dSumofOuts += outPutB + outPutG + outPutR;
-							}
-							else
-							{
-								noutPut = ndata[nX];
-								if (noutPut > 255){ dSumofSLoss += (noutPut - 255)*(noutPut - 255); }
-								else if (noutPut < 0){ dSumofSLoss += noutPut * noutPut; }
-								dSumofSquaredOuts += noutPut*noutPut;
-								dSumofOuts += noutPut;
-							}
-						}
-					}
-					float fMean = dSumofOuts / (float)nNumofPixels;
-					float fCost = costLambda*dSumofSLoss / (float)nNumofPixels - (dSumofSquaredOuts / (float)nNumofPixels - fMean*fMean);
-					if (iterCount == 0)
-					{
-						vCost.push_back(fCost);
-						vTrans.push_back(0.3);
-					}
-					else if (vCost[index] > fCost)
-					{
-						vCost[index] = fCost;
-						transmission(cv::Rect(startX, startY, endX - startX, endY - startY)) = cv::Scalar(vTrans[index]);
-					}
-					vTrans[index] += 0.1;
-					vTempTrans[index] = (int)(1.0f / vTempTrans[index] * 128.0f);
-					index++;
-				}
+				int endX( __min(startX + transBlockSize.width, srcImage.cols) );
+				int endY( __min(startY + transBlockSize.height, srcImage.rows) );
+				roiMat = srcImage(cv::Rect(startX, startY, endX - startX, endY - startY));
+				blockTrans = EstimateBlockTrans(roiMat, costLambda, vAtom);
+				transmission(cv::Rect(startX, startY, endX - startX, endY - startY)) = cv::Scalar(blockTrans);
 			}
 		}
 	}
 	catch (cv::Exception& e)
+	{
+		throw e;
+	}
+	catch (std::exception& e)
 	{
 		throw e;
 	}
@@ -318,30 +362,30 @@ void GuidedFileter(cv::Mat& guidedImage, cv::Mat& inputImage, cv::Mat& outPutIma
 	{
 		//转换源图像信息
 		cv::Mat srcImage, srcClone;
-		inputImage.convertTo(srcImage, CV_64FC1);
-		guidedImage.convertTo(srcClone, CV_64FC1);
+		inputImage.convertTo(srcImage, CV_32FC1);
+		guidedImage.convertTo(srcClone, CV_32FC1);
 		int nRows = srcImage.rows;
 		int nCols = srcImage.cols;
 		cv::Mat boxResult;
 		//步骤一：计算均值
 		cv::boxFilter(cv::Mat::ones(nRows, nCols, srcImage.type()),
-			boxResult, CV_64FC1, cv::Size(r, r));
+			boxResult, CV_32FC1, cv::Size(r, r));
 		//生成导向均值mean_I
 		cv::Mat mean_I;
-		cv::boxFilter(srcImage, mean_I, CV_64FC1, cv::Size(r, r));
+		cv::boxFilter(srcImage, mean_I, CV_32FC1, cv::Size(r, r));
 		//生成原始均值mean_p
 		cv::Mat mean_p;
-		boxFilter(srcClone, mean_p, CV_64FC1, cv::Size(r, r));
+		boxFilter(srcClone, mean_p, CV_32FC1, cv::Size(r, r));
 		//生成互相关均值mean_Ip
 		cv::Mat mean_Ip;
 		cv::boxFilter(srcImage.mul(srcClone), mean_Ip,
-			CV_64FC1, cv::Size(r, r));
+			CV_32FC1, cv::Size(r, r));
 		cv::Mat cov_Ip = mean_Ip - mean_I.mul(mean_p);
 		//生成自相关均值mean_II
 		cv::Mat mean_II;
 		//应用盒滤波器计算相关的值
 		cv::boxFilter(srcImage.mul(srcImage), mean_II,
-			CV_64FC1, cv::Size(r, r));
+			CV_32FC1, cv::Size(r, r));
 		//步骤二：计算相关系数
 		cv::Mat var_I = mean_II - mean_I.mul(mean_I);
 		cv::Mat var_Ip = mean_Ip - mean_I.mul(mean_p);
@@ -350,10 +394,10 @@ void GuidedFileter(cv::Mat& guidedImage, cv::Mat& inputImage, cv::Mat& outPutIma
 		cv::Mat b = mean_p - a.mul(mean_I);
 		//步骤四：计算系数a\b的均值
 		cv::Mat mean_a;
-		cv::boxFilter(a, mean_a, CV_64FC1, cv::Size(r, r));
+		cv::boxFilter(a, mean_a, CV_32FC1, cv::Size(r, r));
 		mean_a = mean_a / boxResult;
 		cv::Mat mean_b;
-		cv::boxFilter(b, mean_b, CV_64FC1, cv::Size(r, r));
+		cv::boxFilter(b, mean_b, CV_32FC1, cv::Size(r, r));
 		mean_b = mean_b / boxResult;
 		//步骤五：生成输出矩阵
 		outPutImage = mean_a.mul(srcImage) + mean_b;

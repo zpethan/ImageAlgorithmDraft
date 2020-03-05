@@ -12,10 +12,14 @@ int main()
 	{
 		std::string fileName = "test.jpg";
 		cv::Mat imInput = cv::imread(fileName, 1);
+		if (imInput.empty() || imInput.data == nullptr)
+		{
+			throw "File test.jpg not exist.";
+		}
 		cv::imshow("srcImage", imInput);
 		cv::waitKey(10);
 		double exec_time = (double)cv::getTickCount();
-		DeHazeBaseonContrastEnhance(imInput, dstImage, cv::Size(30, 30), 5.0, 65, 20, 0.8);
+		DeHazeBaseonContrastEnhance(imInput, dstImage, cv::Size(30, 30), 5.0, imInput.rows > imInput.cols ? (int)imInput.rows / 11 : (int)imInput.cols / 11, 20, 0.85);
 		exec_time = ((double)cv::getTickCount() - exec_time)*1000. / cv::getTickFrequency();
 		
 		std::cout << exec_time/1000.0 << std::endl;
@@ -23,7 +27,6 @@ int main()
 	catch (cv::Exception& e)
 	{
 		std::cout << e.what() << std::endl;
-
 	}
 	catch (std::exception& e)
 	{
