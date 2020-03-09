@@ -13,7 +13,9 @@ void RefiningTransmission(cv::Mat& transmission, cv::Mat& srcImage, cv::Mat& ref
 void RestoreImage(cv::Mat& srcImage, cv::Mat& transmission, cv::Mat& dstImage, std::vector<float>& vAtom);
 
 //导向滤波
-void GuidedFilter(cv::Mat& guidedImage, cv::Mat& inputImage, cv::Mat& outPutImage, int r, double eps);
+void GuidedFilter(cv::Mat& guidedImage, cv::Mat& inputImage, cv::Mat& outPutImage, int filterSize, double eps);
+
+void FastGuidedFilter(cv::Mat& srcImage, cv::Mat& guidedImage, cv::Mat& outputImage, int filterSize, double eps, int samplingRate);
 
 //gamma校正
 void GammaTransform(cv::Mat &image, cv::Mat &dist, double gamma);
@@ -317,6 +319,7 @@ void RefiningTransmission(cv::Mat& transmission, cv::Mat& srcImage, cv::Mat& ref
 	if (channels == 3){ cv::cvtColor(srcImage, guidedImage, cv::COLOR_BGR2GRAY); }
 	else{ guidedImage = srcImage.clone(); }
 	GuidedFilter(vInputImage[0], guidedImage, refinedTransmission, r, eps);
+	//FastGuidedFilter(vInputImage[0], guidedImage, refinedTransmission, r, eps, 2.0);
 }
 
 void RestoreImage(cv::Mat& srcImage, cv::Mat& transmission, cv::Mat& dstImage, std::vector<float>& vAtom)
@@ -343,53 +346,76 @@ void RestoreImage(cv::Mat& srcImage, cv::Mat& transmission, cv::Mat& dstImage, s
 	pilotImage.convertTo(dstImage, CV_8U);
 }
 
-void GuidedFilter(cv::Mat& guidedImage, cv::Mat& inputImage, cv::Mat& outPutImage, int r, double eps)
+void GuidedFilter(cv::Mat& srcImage, cv::Mat& guidedImage, cv::Mat& outputImage, int filterSize, double eps)
 {
 	try
 	{
-		//转换源图像信息
-		cv::Mat srcImage, srcClone;
-		inputImage.convertTo(srcImage, CV_32FC1);
-		guidedImage.convertTo(srcClone, CV_32FC1);
-		int nRows = srcImage.rows;
-		int nCols = srcImage.cols;
-		cv::Mat boxResult;
-		//步骤一：计算均值
-		cv::boxFilter(cv::Mat::ones(nRows, nCols, srcImage.type()),
-			boxResult, CV_32FC1, cv::Size(r, r));
-		//生成导向均值mean_I
-		cv::Mat mean_I;
-		cv::boxFilter(srcImage, mean_I, CV_32FC1, cv::Size(r, r));
-		//生成原始均值mean_p
-		cv::Mat mean_p;
-		boxFilter(srcClone, mean_p, CV_32FC1, cv::Size(r, r));
-		//生成互相关均值mean_Ip
-		cv::Mat mean_Ip;
-		cv::boxFilter(srcImage.mul(srcClone), mean_Ip,
-			CV_32FC1, cv::Size(r, r));
-		cv::Mat cov_Ip = mean_Ip - mean_I.mul(mean_p);
-		//生成自相关均值mean_II
-		cv::Mat mean_II;
-		//应用盒滤波器计算相关的值
-		cv::boxFilter(srcImage.mul(srcImage), mean_II,
-			CV_32FC1, cv::Size(r, r));
-		//步骤二：计算相关系数
-		cv::Mat var_I = mean_II - mean_I.mul(mean_I);
-		cv::Mat var_Ip = mean_Ip - mean_I.mul(mean_p);
-		//步骤三：计算参数系数a,b
-		cv::Mat a = cov_Ip / (var_I + eps);
-		cv::Mat b = mean_p - a.mul(mean_I);
-		//步骤四：计算系数a\b的均值
-		cv::Mat mean_a;
-		cv::boxFilter(a, mean_a, CV_32FC1, cv::Size(r, r));
-		mean_a = mean_a / boxResult;
-		cv::Mat mean_b;
-		cv::boxFilter(b, mean_b, CV_32FC1, cv::Size(r, r));
-		mean_b = mean_b / boxResult;
-		//步骤五：生成输出矩阵
-		outPutImage = mean_a.mul(srcImage) + mean_b;
+		if (srcImage.empty() || guidedImage.empty() || filterSize <= 0 || eps < 0 ||
+			srcImage.channels() != 1 || guidedImage.channels() != 1)
+		{
+			throw "params input error";
+		}
+		cv::Mat srcImageP, srcImageI, meanP, meanI, meanIP, meanII, varII, alfa, beta;
+		srcImage.convertTo(srcImageP, CV_32FC1);
+		guidedImage.convertTo(srcImageI, CV_32FC1);
+		cv::boxFilter(srcImageP, meanP, CV_32FC1, cv::Size(filterSize, filterSize));
+		cv::boxFilter(srcImageI, meanI, CV_32FC1, cv::Size(filterSize, filterSize));
+		cv::boxFilter(srcImageI.mul(srcImageP), meanIP, CV_32FC1, cv::Size(filterSize, filterSize));
+		cv::boxFilter(srcImageI.mul(srcImageI), meanII, CV_32FC1, cv::Size(filterSize, filterSize));
+		varII = meanII - meanI.mul(meanI);
+		alfa = (meanIP - meanI.mul(meanP)) / (varII + eps);
+		beta = meanP - alfa.mul(meanI);
+		cv::boxFilter(alfa, alfa, CV_32FC1, cv::Size(filterSize, filterSize));
+		cv::boxFilter(beta, beta, CV_32FC1, cv::Size(filterSize, filterSize));
+		outputImage = (alfa.mul(srcImageI) + beta);
 	}
 	catch (cv::Exception& e)
+	{
+		throw e;
+	}
+	catch (std::exception& e)
+	{
+		throw e;
+	}
+}
+
+void FastGuidedFilter(cv::Mat& srcImage, cv::Mat& guidedImage, cv::Mat& outputImage, int filterSize, double eps, int samplingRate)
+{
+	try
+	{
+		if (srcImage.empty() || guidedImage.empty() || filterSize <= 0 || eps < 0 ||
+			srcImage.channels() != 1 || guidedImage.channels() != 1 || samplingRate < 1)
+		{
+			throw "params input error";
+		}
+		cv::Mat srcImageP, srcImageSubI, srcImageI, meanP, meanI, meanIP, meanII, var, alfa, beta;
+
+		cv::resize(srcImage, srcImageP, cv::Size(srcImage.cols / samplingRate, srcImage.rows / samplingRate));
+		cv::resize(guidedImage, srcImageSubI, cv::Size(srcImage.cols / samplingRate, srcImage.rows / samplingRate));
+
+		filterSize = filterSize / samplingRate;
+
+		srcImageP.convertTo(srcImageP, CV_32FC1);
+		guidedImage.convertTo(srcImageI, CV_32FC1);
+		srcImageSubI.convertTo(srcImageSubI, CV_32FC1);
+		cv::boxFilter(srcImageP, meanP, CV_32FC1, cv::Size(filterSize, filterSize));
+		cv::boxFilter(srcImageSubI, meanI, CV_32FC1, cv::Size(filterSize, filterSize));
+		cv::boxFilter(srcImageSubI.mul(srcImageP), meanIP, CV_32FC1, cv::Size(filterSize, filterSize));
+		cv::boxFilter(srcImageSubI.mul(srcImageSubI), meanII, CV_32FC1, cv::Size(filterSize, filterSize));
+		var = meanII - meanI.mul(meanI);
+		alfa = (meanIP - meanI.mul(meanP)) / (var + eps);
+		beta = meanP - alfa.mul(meanI);
+		cv::boxFilter(alfa, alfa, CV_32FC1, cv::Size(filterSize, filterSize));
+		cv::boxFilter(beta, beta, CV_32FC1, cv::Size(filterSize, filterSize));
+		cv::resize(alfa, alfa, cv::Size(srcImage.cols, srcImage.rows));
+		cv::resize(beta, beta, cv::Size(srcImage.cols, srcImage.rows));
+		outputImage = alfa.mul(srcImageI) + beta;
+	}
+	catch (cv::Exception& e)
+	{
+		throw e;
+	}
+	catch (std::exception& e)
 	{
 		throw e;
 	}

@@ -30,8 +30,8 @@ int main()
 		for (int i = 0; i < imInput.channels(); i++)
 		{
 			//导向滤波和快速导向滤波选一个测试
-			GuidedFilter(vSplitImage[i], vSplitImage[i], vSplitImage[i], 9, 75);
-			//FastGuidedFilter(vSplitImage[i], vSplitImage[i], vSplitImage[i], 19, 75, 2);
+			//GuidedFilter(vSplitImage[i], vSplitImage[i], vSplitImage[i], 19, 75);
+			FastGuidedFilter(vSplitImage[i], vSplitImage[i], vSplitImage[i], 19, 75, 2);
 		}
 		cv::merge(vSplitImage, dstImage);
 		dstImage.convertTo(dstImage, CV_8U);

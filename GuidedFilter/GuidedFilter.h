@@ -4,9 +4,9 @@
 #include <opencv2/opencv.hpp>
 
 //导向滤波
-void GuidedFilter(cv::Mat& srcImage, cv::Mat& guidedImage, cv::Mat& outputImage, int radius, double eps);
+void GuidedFilter(cv::Mat& srcImage, cv::Mat& guidedImage, cv::Mat& outputImage, int filterSize, double eps);
 
 //快速导向滤波
-void FastGuidedFilter(cv::Mat& srcImage, cv::Mat& guidedImage, cv::Mat& outputImage, int radius, double eps, int samplingRate);
+void FastGuidedFilter(cv::Mat& srcImage, cv::Mat& guidedImage, cv::Mat& outputImage, int filterSize, double eps, int samplingRate);
 
 #endif
