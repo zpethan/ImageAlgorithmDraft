@@ -13,7 +13,7 @@ void RefiningTransmission(cv::Mat& transmission, cv::Mat& srcImage, cv::Mat& ref
 void RestoreImage(cv::Mat& srcImage, cv::Mat& transmission, cv::Mat& dstImage, std::vector<float>& vAtom);
 
 //导向滤波
-void GuidedFileter(cv::Mat& guidedImage, cv::Mat& inputImage, cv::Mat& outPutImage, int r, double eps);
+void GuidedFilter(cv::Mat& guidedImage, cv::Mat& inputImage, cv::Mat& outPutImage, int r, double eps);
 
 //gamma校正
 void GammaTransform(cv::Mat &image, cv::Mat &dist, double gamma);
@@ -38,23 +38,10 @@ void DeHazeBaseonContrastEnhance(cv::Mat& srcImg, cv::Mat& dstImg, cv::Size& tra
 		{
 			vAtom.push_back(255);
 		}
-		double exec_time = (double)cv::getTickCount();
 		EstimateAirlight(srcImg, cv::Size(20, 20), vAtom);
-		exec_time = ((double)cv::getTickCount() - exec_time)*1000. / cv::getTickFrequency();
-		std::cout << exec_time / 1000.0 << std::endl;
-		exec_time = (double)cv::getTickCount();
 		EstimateTransmission(srcImg, transmission, transBlockSize, fLambda, vAtom);
-		exec_time = ((double)cv::getTickCount() - exec_time)*1000. / cv::getTickFrequency();
-		std::cout << exec_time / 1000.0 << std::endl;
-		exec_time = (double)cv::getTickCount();
 		RefiningTransmission(transmission, srcImg, transmission, guidedRadius, eps);
-		exec_time = ((double)cv::getTickCount() - exec_time)*1000. / cv::getTickFrequency();
-		std::cout << exec_time / 1000.0 << std::endl;
-		exec_time = (double)cv::getTickCount();
 		RestoreImage(srcImg, transmission, dstImg, vAtom);
-		exec_time = ((double)cv::getTickCount() - exec_time)*1000. / cv::getTickFrequency();
-		std::cout << exec_time / 1000.0 << std::endl;
-
 		GammaTransform(dstImg, dstImg, fGamma);
 	}
 	catch (cv::Exception& e)
@@ -329,7 +316,7 @@ void RefiningTransmission(cv::Mat& transmission, cv::Mat& srcImage, cv::Mat& ref
 	cv::Mat guidedImage;
 	if (channels == 3){ cv::cvtColor(srcImage, guidedImage, cv::COLOR_BGR2GRAY); }
 	else{ guidedImage = srcImage.clone(); }
-	GuidedFileter(vInputImage[0], guidedImage, refinedTransmission, r, eps);
+	GuidedFilter(vInputImage[0], guidedImage, refinedTransmission, r, eps);
 }
 
 void RestoreImage(cv::Mat& srcImage, cv::Mat& transmission, cv::Mat& dstImage, std::vector<float>& vAtom)
@@ -356,7 +343,7 @@ void RestoreImage(cv::Mat& srcImage, cv::Mat& transmission, cv::Mat& dstImage, s
 	pilotImage.convertTo(dstImage, CV_8U);
 }
 
-void GuidedFileter(cv::Mat& guidedImage, cv::Mat& inputImage, cv::Mat& outPutImage, int r, double eps)
+void GuidedFilter(cv::Mat& guidedImage, cv::Mat& inputImage, cv::Mat& outPutImage, int r, double eps)
 {
 	try
 	{

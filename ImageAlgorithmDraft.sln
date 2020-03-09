@@ -5,6 +5,8 @@ VisualStudioVersion = 12.0.30501.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DeHazeBaseonContrastEnhance", "DeHazeBaseonContrastEnhance\DeHazeBaseonContrastEnhance.vcxproj", "{CF2E86BF-A017-4066-BC1B-95B1C1C54ABF}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GuidedFilter", "GuidedFilter\GuidedFilter.vcxproj", "{C2FF6275-717F-4F96-8691-139BC7C5D7E5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -15,6 +17,10 @@ Global
 		{CF2E86BF-A017-4066-BC1B-95B1C1C54ABF}.Debug|Win32.Build.0 = Debug|Win32
 		{CF2E86BF-A017-4066-BC1B-95B1C1C54ABF}.Release|Win32.ActiveCfg = Release|Win32
 		{CF2E86BF-A017-4066-BC1B-95B1C1C54ABF}.Release|Win32.Build.0 = Release|Win32
+		{C2FF6275-717F-4F96-8691-139BC7C5D7E5}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C2FF6275-717F-4F96-8691-139BC7C5D7E5}.Debug|Win32.Build.0 = Debug|Win32
+		{C2FF6275-717F-4F96-8691-139BC7C5D7E5}.Release|Win32.ActiveCfg = Release|Win32
+		{C2FF6275-717F-4F96-8691-139BC7C5D7E5}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
