@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DeHazeBaseonContrastEnhance
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GuidedFilter", "GuidedFilter\GuidedFilter.vcxproj", "{C2FF6275-717F-4F96-8691-139BC7C5D7E5}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DataStructAndAlgorithm", "DataStruct\DataStruct.vcxproj", "{FBE31477-E5ED-4D37-9A9F-2DC0160588FE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -21,6 +23,10 @@ Global
 		{C2FF6275-717F-4F96-8691-139BC7C5D7E5}.Debug|Win32.Build.0 = Debug|Win32
 		{C2FF6275-717F-4F96-8691-139BC7C5D7E5}.Release|Win32.ActiveCfg = Release|Win32
 		{C2FF6275-717F-4F96-8691-139BC7C5D7E5}.Release|Win32.Build.0 = Release|Win32
+		{FBE31477-E5ED-4D37-9A9F-2DC0160588FE}.Debug|Win32.ActiveCfg = Debug|Win32
+		{FBE31477-E5ED-4D37-9A9F-2DC0160588FE}.Debug|Win32.Build.0 = Debug|Win32
+		{FBE31477-E5ED-4D37-9A9F-2DC0160588FE}.Release|Win32.ActiveCfg = Release|Win32
+		{FBE31477-E5ED-4D37-9A9F-2DC0160588FE}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

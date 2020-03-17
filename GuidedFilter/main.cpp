@@ -3,7 +3,6 @@
 #pragma comment(lib, "opencv_imgproc2410d.lib")
 #pragma comment(lib, "opencv_features2d2410d.lib")
 #pragma comment(lib, "opencv_highgui2410d.lib")
-
 int main()
 {
 	cv::namedWindow("srcImage", cv::WINDOW_AUTOSIZE);
